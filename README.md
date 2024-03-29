@@ -48,7 +48,7 @@ pip install -r requirements.txt
 With the virtual environment activated and the requirements installed, you can launch the project by running:
 
 ```bash
-python main.py
+`python src/main.py`
 ```
 
 This will execute the `main.py` script located at the root of the project directory.

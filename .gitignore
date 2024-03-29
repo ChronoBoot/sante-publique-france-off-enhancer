@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pyzw
+*.pyc
+
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Data files
+/csv
+*.csv
+*.json
+*.xlsx
+*.xls
+*.txt
+*.dat
+*.xml
+*.sql

@@ -171,7 +171,6 @@ ehthumbs.db
 Thumbs.db
 
 # Data files
-/csv
 *.csv
 *.json
 *.xlsx

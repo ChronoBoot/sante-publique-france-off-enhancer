@@ -178,3 +178,6 @@ Thumbs.db
 *.dat
 *.xml
 *.sql
+
+# IDE
+.idea/

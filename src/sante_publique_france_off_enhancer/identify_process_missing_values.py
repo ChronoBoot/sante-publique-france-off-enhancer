@@ -1,10 +1,10 @@
 """## Step 3 : Identify and process missing values"""
-from src.identify_process_abnormal_values import *
-from src.classes.nutrition_facts import NutritionFacts
-from src.classes.na_count import NaCount
+from src.sante_publique_france_off_enhancer.identify_process_abnormal_values import *
+from src.sante_publique_france_off_enhancer.classes.nutrition_facts import NutritionFacts
+from src.sante_publique_france_off_enhancer.classes.na_count import NaCount
 
 
-def get_na_counts(df: pd.DataFrame) -> list[NaCount]:
+def get_na_counts(df: DataFrame) -> list[NaCount]:
     fields = df.columns
 
     na_counts = [NaCount(col) for col in fields]
@@ -15,9 +15,9 @@ def get_na_counts(df: pd.DataFrame) -> list[NaCount]:
     return na_counts
 
 
-def na_counts_to_dataframe(na_counts: list[NaCount]) -> pd.DataFrame:
+def na_counts_to_dataframe(na_counts: list[NaCount]) -> DataFrame:
     data = [{"name": na_count.column, 'sumNa': na_count.sumNa} for na_count in na_counts]
-    df = pd.DataFrame(data)
+    df = DataFrame(data)
     df.set_index('name', inplace=True)
 
     return df
@@ -104,7 +104,7 @@ def fill_additives(row: pd.Series) -> pd.Series:
     return row
 
 
-def set_median_values(df: pd.DataFrame) -> pd.DataFrame:
+def set_median_values(df: DataFrame) -> DataFrame:
     columns = [
         'additives_n',
         'ingredients_from_palm_oil_n',
@@ -128,17 +128,17 @@ def set_median_values(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def add_median_value(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
+def add_median_value(df: DataFrame, column_name: str) -> DataFrame:
     pnns_groups_2_values = df['pnns_groups_2'].unique()
 
     for pnns_group_2 in pnns_groups_2_values:
         median_value = get_median_value(df, column_name, pnns_group_2)
-        df[df['pnns_groups_2'] == pnns_group_2][f"median_{column_name}"] = median_value
+        df.loc[df['pnns_groups_2'] == pnns_group_2, f"median_{column_name}"] = median_value
 
     return df
 
 
-def get_median_value(df: pd.DataFrame, column_name: str, pnns_group_2: str) -> float:
+def get_median_value(df: DataFrame, column_name: str, pnns_group_2: str) -> float:
     return df.loc[df['pnns_groups_2'] == pnns_group_2, column_name].median()
 
 
@@ -168,7 +168,7 @@ def fill_missing_values_with_pnns_groups_2_median(row: pd.Series) -> pd.Series:
 
 if __name__ == '__main__':
     off_df = load_csv()
-    cleaned_data_with_abnormal_values_processed = abnormal_values_processing(off_df)
+    cleaned_data_with_abnormal_values_processed = abnormal_values_processing(off_df).head(100)
 
     print(f"Before filling missing values, number of nutriscore missing: "
           f"{cleaned_data_with_abnormal_values_processed['nutrition-score-fr_100g'].isna().sum()}")
@@ -179,7 +179,7 @@ if __name__ == '__main__':
     print(f"After filling missing values, number of nutriscore missing: "
           f"{cleaned_data_with_abnormal_values_processed['nutrition-score-fr_100g'].isna().sum()}")
 
-    cleaned_data_with_abnormal_values_processed = set_median_values(cleaned_data_with_abnormal_values_processed)
-
-    cleaned_data_with_abnormal_values_processed = (
-        cleaned_data_with_abnormal_values_processed.apply(fill_missing_values_with_pnns_groups_2_median, axis=1))
+    # cleaned_data_with_abnormal_values_processed = set_median_values(cleaned_data_with_abnormal_values_processed)
+    #
+    # cleaned_data_with_abnormal_values_processed = (
+    #     cleaned_data_with_abnormal_values_processed.apply(fill_missing_values_with_pnns_groups_2_median, axis=1))

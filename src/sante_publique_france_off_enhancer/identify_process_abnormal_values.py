@@ -1,13 +1,21 @@
 """## Step 2 : Identify and process abnormal values"""
 import matplotlib.pyplot as plt
+import pandas as pd
 import plotly.express as px
 import seaborn as sns
+from pyspark.sql.functions import desc
+from pyspark.sql.types import StructType, StructField, IntegerType, DoubleType
 
-from src.cleaning_filtering_features_products import *
-from src.classes.bounds import *
+from src.sante_publique_france_off_enhancer.classes.bounds import *
+from src.sante_publique_france_off_enhancer.cleaning_filtering_features_products import *
+
+logger = SingletonLogger.get_instance()
+spark = SingletonSparkSession.get_instance()
 
 
 def boxplot_features_pyplot(df: pd.DataFrame, features_names: list[str], title: str):
+    logger.debug(f"Creating boxplot for features using pyplot: {features_names}")
+
     df_ingredients_features = df[features_names]
     df_ingredients_features_melted = pd.melt(df_ingredients_features, var_name="Feature", value_name="Value")
 
@@ -17,16 +25,24 @@ def boxplot_features_pyplot(df: pd.DataFrame, features_names: list[str], title: 
     plt.ylabel("Value")
     plt.show()
 
+    logger.debug(f"Boxplot for features: {features_names} created with pyplot")
+
 
 def boxplot_features_plotly(df: pd.DataFrame, features_names: list[str], title: str):
+    logger.debug(f"Creating boxplot for features using plotly: {features_names}")
+
     df_filtered = df[features_names]
 
     fig = px.box(df_filtered, y=features_names, labels={'variable': 'Features', 'value': 'Value'}, title=title)
 
     fig.show()
 
+    logger.debug(f"Boxplot for features: {features_names} created with plotly")
+
 
 def bar_chart_pyplot(df: pd.DataFrame, feature_name: str, title: str):
+    logger.debug(f"Creating bar chart for feature using pyplot: {feature_name}")
+
     category_counts = df[feature_name].value_counts()
 
     plt.figure(figsize=(15, 5))
@@ -40,8 +56,12 @@ def bar_chart_pyplot(df: pd.DataFrame, feature_name: str, title: str):
     plt.xticks(rotation=45)
     plt.show()
 
+    logger.debug(f"Bar chart for feature: {feature_name} created with pyplot")
+
 
 def bar_chart_plotly(df: pd.DataFrame, feature_name: str, title: str):
+    logger.debug(f"Creating bar chart for feature using plotly: {feature_name}")
+
     fig = px.bar(df, x=feature_name, title=title,
                  labels={feature_name: 'Category', 'count': 'Frequency'},
                  text_auto=True)
@@ -56,8 +76,12 @@ def bar_chart_plotly(df: pd.DataFrame, feature_name: str, title: str):
 
     fig.show()
 
+    logger.debug(f"Bar chart for feature: {feature_name} created with plotly")
+
 
 def display_features_box_plots(df: pd.DataFrame):
+    logger.debug("Displaying features box plots")
+
     nb_additives_feature_name = ["additives_n"]
 
     nb_ingredients_features_names = [
@@ -87,8 +111,12 @@ def display_features_box_plots(df: pd.DataFrame):
     boxplot_features_plotly(df, nutritional_features_names, "Box plots for nutritional features")
     boxplot_features_plotly(df, nutriscore_feature_name, "Boxplot for nutriscore feature")
 
+    logger.debug("Features box plots displayed")
+
 
 def display_features_bar_plots(df: pd.DataFrame):
+    logger.debug("Displaying features bar plots")
+
     nutriscore_grade_feature_name = "nutrition_grade_fr"
 
     pnns_groups_1_feature_name = "pnns_groups_1"
@@ -98,42 +126,97 @@ def display_features_bar_plots(df: pd.DataFrame):
     bar_chart_pyplot(df, pnns_groups_1_feature_name, "Boxplot for pnns main groups feature")
     bar_chart_pyplot(df, pnns_groups_2_feature_name, "Boxplot for pnns main subgroups feature")
 
+    logger.debug("Features bar plots displayed")
 
-def outlier_thresholds(df: pd.DataFrame, column_name: str, default_lower_bound: float = 0) -> tuple[float, float]:
-    q1 = df[column_name].quantile(0.25)
-    q3 = df[column_name].quantile(0.75)
+
+def display_features_plots(df: DataFrame):
+    pd_df = df.toPandas()
+
+    display_features_box_plots(pd_df)
+    display_features_bar_plots(pd_df)
+
+
+def outlier_thresholds(df: DataFrame, column_name: str, default_lower_bound: float = 0) -> tuple[float, float]:
+    logger.debug(f"Calculating outlier thresholds for column: {column_name}")
+
+    # Calculate the first and third quartiles using approxQuantile
+    q1, q3 = df.approxQuantile(column_name, [0.25, 0.75], 0)
     iqr = q3 - q1
     lower_bound = max(q1 - 1.5 * iqr, default_lower_bound)
     upper_bound = q3 + 1.5 * iqr
+
+    logger.debug(
+        f"Outlier thresholds for column: {column_name} calculated: "
+        f"lower bound: {lower_bound}, upper bound: {upper_bound}"
+    )
+
     return lower_bound, upper_bound
 
 
-def filter_abnormal_values(bounds_list: list[Bounds], df: pd.DataFrame) -> pd.DataFrame:
+def filter_abnormal_values(bounds_list: list[Bounds], df: DataFrame) -> DataFrame:
+    logger.debug("Filtering abnormal values")
+
     for bounds in bounds_list:
-        df[bounds.column] = df[(df[bounds.column] >= bounds.min) & (df[bounds.column] <= bounds.max)][
-            bounds.column]
+        df = df.withColumn(
+            bounds.column,
+            when((col(bounds.column) >= bounds.min) & (col(bounds.column) <= bounds.max), col(bounds.column)).otherwise(
+                None)
+        )
+
+    logger.debug("Abnormal values filtered")
+
     return df
 
 
-def filter_allowed_values(allowed_values: list[float | str], df: pd.DataFrame, column: str) -> pd.DataFrame:
-    df[column] = df[df[column].isin(allowed_values)][column]
+def filter_allowed_values(allowed_values: list[float | str], df: DataFrame, column: str) -> DataFrame:
+    logger.debug(f"Filtering allowed values for column: {column}")
+
+    df = df.withColumn(
+        column,
+        when(col(column).isin(allowed_values), col(column)).otherwise(None)
+    )
+
     return df
 
 
-def find_higher_bound(df: pd.DataFrame, column: str, frequency_threshold: float) -> float:
-    frequencies = df[column].value_counts(normalize=True).sort_index(ascending=False)
+def find_higher_bound(df: DataFrame, column: str, frequency_threshold: float) -> float:
+    logger.debug(f"Finding higher bound for column: {column}")
 
-    cumulative_frequencies = frequencies.cumsum()
-    filtered_values = cumulative_frequencies[cumulative_frequencies <= frequency_threshold]
+    df_without_null = df.filter(df[column].isNotNull())
 
-    if not filtered_values.empty:
-        return filtered_values.index[-1]
+    frequencies_df = df_without_null.groupBy(column).count()
+
+    total_count = df_without_null.count()
+    frequencies_df = frequencies_df.withColumn('frequency', col('count') / total_count)
+
+    frequencies_sorted = frequencies_df.sort(desc(column))
+
+    cumulative_frequency = 0
+    rows_data = []
+    for row in frequencies_sorted.collect():
+        cumulative_frequency += row['frequency']
+        rows_data.append(Row(column=row[column], cumulative_frequency=cumulative_frequency))
+
+    max_value = max(
+         (float(row['column']) for row in rows_data if row['cumulative_frequency'] >= frequency_threshold),
+         default=None
+    )
+
+    logger.debug(f"Higher bound for column: {column} found: {max_value}")
+
+    if max_value is not None:
+        return max_value
     else:
-        return max(df[column])
+        # Fallback: Return the maximum value if no filtered values are found
+        max_fallback = df.agg({column: 'max'}).collect()[0][0]
+        return float(max_fallback)
 
 
-def abnormal_values_processing(df: pd.DataFrame) -> pd.DataFrame:
+@cache
+def abnormal_values_processing(df: DataFrame) -> DataFrame:
     cleaned_df, features = cleaning_and_filtering_of_features_and_products(df)
+
+    logger.info(f"Before processing abnormal values: {cleaned_df.count()}")
 
     frequency_threshold = 0.01
 
@@ -172,22 +255,13 @@ def abnormal_values_processing(df: pd.DataFrame) -> pd.DataFrame:
     filter_df = filter_abnormal_values(bounds_list, cleaned_df)
     filter_df = filter_allowed_values(allowed_values_nutritional_grade, filter_df, "nutrition_grade_fr")
 
+    logger.info(f"After processing abnormal values: {filter_df.count()}")
+
     return filter_df
 
 
 if __name__ == "__main__":
     off_df = load_csv()
 
-    print(f"Before cleaning and filtering: {len(off_df)} products.")
-    cleaned_data_with_abnormal_values_processed, cleaned_fields = (
-        cleaning_and_filtering_of_features_and_products(off_df))
-    print(f"After cleaning and filtering: {len(cleaned_data_with_abnormal_values_processed)} products.")
-
     cleaned_data_with_abnormal_values_processed = abnormal_values_processing(
-        cleaned_data_with_abnormal_values_processed)
-    print(f"After cleaning and filtering and abnormal value processing : "
-          f"{len(cleaned_data_with_abnormal_values_processed)} products."
-          )
-
-    display_features_box_plots(cleaned_data_with_abnormal_values_processed)
-    display_features_bar_plots(cleaned_data_with_abnormal_values_processed)
+        off_df)

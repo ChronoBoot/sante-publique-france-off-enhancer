@@ -229,7 +229,7 @@ def abnormal_values_processing(df: DataFrame) -> DataFrame:
 
     nutrition_score_lower_bound, nutrition_score_higher_bound = outlier_thresholds(
         cleaned_df,
-        "nutrition-score-fr_100g",
+        "nutrition_score_fr_100g",
         -20
     )
 
@@ -238,7 +238,7 @@ def abnormal_values_processing(df: DataFrame) -> DataFrame:
         Bounds("ingredients_from_palm_oil_n", 0, ingredients_from_palm_oil_n_higher_bound),
         Bounds("ingredients_that_may_be_from_palm_oil_n", 0, ingredients_that_may_be_from_palm_oil_n_higher_bound),
         Bounds("fat_100g", 0, 100),
-        Bounds("saturated-fat_100g", 0, 100),
+        Bounds("saturated_fat_100g", 0, 100),
         Bounds("sugars_100g", 0, 100),
         Bounds("salt_100g", 0, 100),
         Bounds("energy_100g", 0, 3700),
@@ -246,8 +246,8 @@ def abnormal_values_processing(df: DataFrame) -> DataFrame:
         Bounds("fiber_100g", 0, 11),
         Bounds("proteins_100g", 0, 33),
         Bounds("sodium_100g", 0, 40),
-        Bounds("nutrition-score-fr_100g", nutrition_score_lower_bound, nutrition_score_higher_bound),
-        Bounds("fruits-vegetables-nuts_100g", 0, 100)
+        Bounds("nutrition_score_fr_100g", nutrition_score_lower_bound, nutrition_score_higher_bound),
+        Bounds("fruits_vegetables_nuts_100g", 0, 100)
     ]
 
     allowed_values_nutritional_grade = ['a', 'b', 'c', 'd', 'e']

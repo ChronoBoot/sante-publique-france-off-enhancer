@@ -1,130 +1,120 @@
 import dataclasses
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import when
+from functools import reduce
 
-import numpy as np
-from scipy.optimize import fsolve
 
+#TODO apply filter
+#TODO use median value
+#TODO use KNN or linear regression => set the list of correlated variables
 
 @dataclasses.dataclass
 class NutritionFacts:
-    energy: float = None
-    sat_fat: float = None
-    sugars: float = None
-    sodium: float = None
-    protein: float = None
-    fiber: float = None
-    fruits_vegetables_nuts: float = None
-    energy_points: float = dataclasses.field(init=False, default=None)
-    sat_fat_points: float = dataclasses.field(init=False, default=None)
-    sugars_points: float = dataclasses.field(init=False, default=None)
-    sodium_points: float = dataclasses.field(init=False, default=None)
-    protein_points: float = dataclasses.field(init=False, default=None)
-    fiber_points: float = dataclasses.field(init=False, default=None)
-    fruits_vegetables_nuts_points: float = dataclasses.field(init=False, default=None)
+    appetizers = {'pnns_groups_2': 'Appetizers', 'energy_100g': True, 'saturated_fat_100g': True, 'sugars_100g': True,
+                  'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
+    artificially_sweetened_beverages = {'pnns_groups_2': 'Artificially sweetened beverages', 'energy_100g': True,
+                                        'saturated_fat_100g': True, 'sugars_100g': True, 'sodium_100g': True,
+                                        'proteins_100g': True, 'fiber_100g': False, 'fruits_vegetables_nuts_100g': True}
+    biscuits_and_cakes = {'pnns_groups_2': 'Biscuits and cakes', 'energy_100g': True, 'saturated_fat_100g': True,
+                          'sugars_100g': True, 'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True,
+                          'fruits_vegetables_nuts_100g': True}
+    bread = {'pnns_groups_2': 'Bread', 'energy_100g': True, 'saturated_fat_100g': True, 'sugars_100g': True,
+             'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
+    breakfast_cereals = {'pnns_groups_2': 'Breakfast cereals', 'energy_100g': True, 'saturated_fat_100g': True,
+                         'sugars_100g': True, 'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True,
+                         'fruits_vegetables_nuts_100g': True}
+    cereals = {'pnns_groups_2': 'Cereals', 'energy_100g': True, 'saturated_fat_100g': True, 'sugars_100g': True,
+               'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
+    cheese = {'pnns_groups_2': 'Cheese', 'energy_100g': True, 'saturated_fat_100g': True, 'sugars_100g': True,
+              'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': False, 'fruits_vegetables_nuts_100g': False}
+    chocolate_products = {'pnns_groups_2': 'Chocolate products', 'energy_100g': True, 'saturated_fat_100g': True,
+                          'sugars_100g': True, 'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True,
+                          'fruits_vegetables_nuts_100g': True}
+    dairy_desserts = {'pnns_groups_2': 'Dairy desserts', 'energy_100g': True, 'saturated_fat_100g': True,
+                      'sugars_100g': True, 'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': False,
+                      'fruits_vegetables_nuts_100g': True}
+    dressings_and_sauces = {'pnns_groups_2': 'Dressings and sauces', 'energy_100g': True, 'saturated_fat_100g': True,
+                            'sugars_100g': True, 'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': False,
+                            'fruits_vegetables_nuts_100g': True}
+    dried_fruits = {'pnns_groups_2': 'Dried fruits', 'energy_100g': True, 'saturated_fat_100g': False,
+                    'sugars_100g': True, 'sodium_100g': False, 'proteins_100g': True, 'fiber_100g': True,
+                    'fruits_vegetables_nuts_100g': True}
+    eggs = {'pnns_groups_2': 'Eggs', 'energy_100g': True, 'saturated_fat_100g': True, 'sugars_100g': False,
+            'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': False, 'fruits_vegetables_nuts_100g': False}
+    fats = {'pnns_groups_2': 'Fats', 'energy_100g': True, 'saturated_fat_100g': True, 'sugars_100g': False,
+            'sodium_100g': False, 'proteins_100g': False, 'fiber_100g': False, 'fruits_vegetables_nuts_100g': False}
+    fish_and_seafood = {'pnns_groups_2': 'Fish and seafood', 'energy_100g': True, 'saturated_fat_100g': True,
+                        'sugars_100g': False, 'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': False,
+                        'fruits_vegetables_nuts_100g': False}
+    fruit_juices = {'pnns_groups_2': 'Fruit juices', 'energy_100g': True, 'saturated_fat_100g': False,
+                    'sugars_100g': True, 'sodium_100g': False, 'proteins_100g': False, 'fiber_100g': False,
+                    'fruits_vegetables_nuts_100g': True}
+    fruit_nectars = {'pnns_groups_2': 'Fruit nectars', 'energy_100g': True, 'saturated_fat_100g': False,
+                     'sugars_100g': True, 'sodium_100g': False, 'proteins_100g': False, 'fiber_100g': False,
+                     'fruits_vegetables_nuts_100g': True}
+    fruits = {'pnns_groups_2': 'Fruits', 'energy_100g': True, 'saturated_fat_100g': False, 'sugars_100g': True,
+              'sodium_100g': False, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
+    ice_cream = {'pnns_groups_2': 'Ice cream', 'energy_100g': True, 'saturated_fat_100g': True, 'sugars_100g': True,
+                 'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
+    legumes = {'pnns_groups_2': 'Legumes', 'energy_100g': True, 'saturated_fat_100g': False, 'sugars_100g': False,
+               'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
+    meat = {'pnns_groups_2': 'Meat', 'energy_100g': True, 'saturated_fat_100g': True, 'sugars_100g': False,
+            'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': False, 'fruits_vegetables_nuts_100g': False}
+    milk_and_yogurt = {'pnns_groups_2': 'Milk and yogurt', 'energy_100g': True, 'saturated_fat_100g': True,
+                       'sugars_100g': True, 'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True,
+                       'fruits_vegetables_nuts_100g': True}
+    non_sugared_beverages = {'pnns_groups_2': 'Non-sugared beverages', 'energy_100g': True, 'saturated_fat_100g': False,
+                             'sugars_100g': False, 'sodium_100g': False, 'proteins_100g': False, 'fiber_100g': False,
+                             'fruits_vegetables_nuts_100g': False}
+    nuts = {'pnns_groups_2': 'Nuts', 'energy_100g': True, 'saturated_fat_100g': True, 'sugars_100g': True,
+            'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
+    one_dish_meals = {'pnns_groups_2': 'One-dish meals', 'energy_100g': True, 'saturated_fat_100g': True,
+                      'sugars_100g': True, 'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True,
+                      'fruits_vegetables_nuts_100g': True}
+    pastries = {'pnns_groups_2': 'Pastries', 'energy_100g': True, 'saturated_fat_100g': True, 'sugars_100g': True,
+                'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
+    pizza_pies_and_quiche = {'pnns_groups_2': 'Pizza pies and quiche', 'energy_100g': True, 'saturated_fat_100g': True,
+                             'sugars_100g': True, 'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True,
+                             'fruits_vegetables_nuts_100g': True}
+    potatoes = {'pnns_groups_2': 'Potatoes', 'energy_100g': True, 'saturated_fat_100g': False, 'sugars_100g': True,
+                'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
+    processed_meat = {'pnns_groups_2': 'Processed meat', 'energy_100g': True, 'saturated_fat_100g': True,
+                      'sugars_100g': False, 'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': False,
+                      'fruits_vegetables_nuts_100g': False}
+    salty_and_fatty_products = {'pnns_groups_2': 'Salty and fatty products', 'energy_100g': True,
+                                'saturated_fat_100g': True, 'sugars_100g': True, 'sodium_100g': True,
+                                'proteins_100g': True, 'fiber_100g': False, 'fruits_vegetables_nuts_100g': True}
+    sandwich = {'pnns_groups_2': 'Sandwich', 'energy_100g': True, 'saturated_fat_100g': True, 'sugars_100g': True,
+                'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
+    soups = {'pnns_groups_2': 'Soups', 'energy_100g': True, 'saturated_fat_100g': False, 'sugars_100g': True,
+             'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
+    sweetened_beverages = {'pnns_groups_2': 'Sweetened beverages', 'energy_100g': True, 'saturated_fat_100g': False,
+                           'sugars_100g': True, 'sodium_100g': True, 'proteins_100g': False, 'fiber_100g': False,
+                           'fruits_vegetables_nuts_100g': True}
+    sweets = {'pnns_groups_2': 'Sweets', 'energy_100g': True, 'saturated_fat_100g': True, 'sugars_100g': True,
+              'sodium_100g': True, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
+    vegetables = {'pnns_groups_2': 'Vegetables', 'energy_100g': True, 'saturated_fat_100g': False, 'sugars_100g': True,
+                  'sodium_100g': False, 'proteins_100g': True, 'fiber_100g': True, 'fruits_vegetables_nuts_100g': True}
 
-    def __post_init__(self):
-        self.update_all_points()
-
-    def update_all_points(self):
-        for nutrient in self.nutrient_names:
-            self.update_points(nutrient)
-
-    @property
-    def nutrient_names(self):
-        return [
-            'energy', 'sat_fat', 'sugars', 'sodium', 'protein', 'fiber', 'fruits_vegetables_nuts'
-        ]
-
-    def update_points(self, nutrient):
-        points_table = self.get_points_table(nutrient)
-        value = getattr(self, nutrient)
-        points = self.calculate_points(value, points_table) if value is not None else None
-        setattr(self, f"{nutrient}_points", points)
+    nutrient_filtering = [appetizers, artificially_sweetened_beverages, biscuits_and_cakes, bread, breakfast_cereals,
+                          cereals, cheese, chocolate_products, dairy_desserts, dressings_and_sauces, dried_fruits,
+                          eggs, fats, fish_and_seafood, fruit_juices, fruit_nectars, fruits, ice_cream, legumes, meat,
+                          milk_and_yogurt, non_sugared_beverages, nuts, one_dish_meals, pastries,
+                          pizza_pies_and_quiche, potatoes, processed_meat, salty_and_fatty_products, sandwich, soups,
+                          sweetened_beverages, sweets, vegetables]
 
     @staticmethod
-    def get_points_table(nutrient):
-        point_tables = {
-            'energy': [335, 670, 1005, 1340, 1675, 2010, 2345, 2680, 3015, 3350],
-            'sat_fat': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-            'sugars': [4.5, 9, 13.5, 18, 22.5, 27, 31, 36, 40, 45],
-            'sodium': [0.090, 0.180, 0.270, 0.360, 0.450, 0.540, 0.630, 0.720, 0.810, 0.900],
-            'protein': [1.6, 3.2, 4.8, 6.4, 8.0],
-            'fiber': [0.9, 1.9, 2.8, 3.7, 4.7],
-            'fruits_vegetables_nuts': [40, 60, 80, 80, 80]
-        }
-        return point_tables[nutrient]
+    def union_two_dfs(df1: DataFrame, df2: DataFrame) -> DataFrame:
+        return df1.union(df2)
 
     @staticmethod
-    def calculate_points(value, points_table):
-        return next((index for index, point in enumerate(points_table) if point >= value), len(points_table))
-
-    @staticmethod
-    def row_to_nutrition_facts(row):
-        return NutritionFacts(
-            energy=row.get('energy_100g', None),
-            sat_fat=row.get('saturated-fat_100g', None),
-            sugars=row.get('sugars_100g', None),
-            sodium=row.get('sodium_100g', None),
-            protein=row.get('proteins_100g', None),
-            fiber=row.get('fiber_100g', None),
-            fruits_vegetables_nuts=row.get('fruits-vegetables-nuts_100g', None),
-        )
-
-    @staticmethod
-    def nutrition_facts_to_row(nutrition_facts, row):
-        for nutrient in nutrition_facts.nutrient_names:
-            row[f'{nutrient}_100g'] = getattr(nutrition_facts, nutrient)
-            row[f'{nutrient}_100g_points'] = getattr(nutrition_facts, f'{nutrient}_points')
-        return row
-
-    def find_all_missing(self):
-        return [nutrient for nutrient in self.nutrient_names if getattr(self, nutrient) is None]
-
-    def get_nb_attributes_missing(self):
-        return len(self.find_all_missing())
-
-    """Find the missing nutritional fact. Should only be called when there is only one missing fact."""
-    def find_missing(self):
-        missing = self.find_all_missing()
-        if len(missing) == 1:
-            return missing[0]
-        elif not missing:
-            raise ValueError("No missing nutritional facts.")
-        else:
-            raise ValueError("Multiple missing nutritional facts, ensure only one is missing for calculation.")
-
-    def calculate_nutriscore(self):
-        negative_points = sum(
-            filter(
-                None, [self.energy_points, self.sat_fat_points, self.sugars_points, self.sodium_points]
-            )
-        )
-        positive_points = sum(
-            filter(
-                None, [self.protein_points, self.fiber_points, self.fruits_vegetables_nuts_points]
-            )
-        )
-        return negative_points - positive_points
-
-    def solve_for_missing_nutrient(self, target_score):
-        missing_attr = self.find_missing()
-        points_table = self.get_points_table(missing_attr)
-        min_diff = np.inf
-        points = 0
-
-        for i in range(0, len(points_table)):
-            setattr(self, missing_attr, i)
-            result = self.calculate_nutriscore()
-            diff = abs(result - target_score)
-            if diff < min_diff:
-                min_diff = diff
-                points = i
-
-        # We take the average value of the nutrient based on the table for the given point
-        if points == 0:
-            missing_attr_value = points_table[points]
-        else:
-            missing_attr_value = (points_table[points-1] + points_table[points])/2
-
-        setattr(self, missing_attr, missing_attr_value)
-        self.update_all_points()
-        return {missing_attr: missing_attr_value}
+    def apply_nutrient_filtering(df: DataFrame):
+        dfs = []
+        for nutrient in NutritionFacts.nutrient_filtering:
+            pnns_group_2 = nutrient['pnns_groups_2']
+            df_filtered = df.filter(df['pnns_groups_2'] == pnns_group_2)
+            for nutrient_name, should_keep in nutrient.items():
+                if nutrient_name != 'pnns_groups_2' and not should_keep:
+                    df_filtered = df_filtered.withColumn(nutrient_name, when(df[nutrient_name].isNotNull(), 0))
+            dfs.append(df_filtered)
+        return reduce(NutritionFacts.union_two_dfs, dfs)

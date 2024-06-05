@@ -138,6 +138,17 @@ def filtered_row(df: DataFrame, targets_names: list[str], incorrect_value=None):
     return filtered_off_df
 
 
+def filter_feature_name(df: DataFrame):
+    logger.debug("Filtering feature name")
+
+    for col_name in df.columns:
+        df = df.withColumnRenamed(col_name, col_name.replace("-", "_"))
+
+    logger.debug("Feature name filtered")
+
+    return df
+
+
 @cache
 def cleaning_and_filtering_of_features_and_products(df: DataFrame) -> tuple[DataFrame, list[DataFrameField]]:
     logger.info(f"Before cleaning and filtering: {df.count()} products.")
@@ -163,6 +174,7 @@ def cleaning_and_filtering_of_features_and_products(df: DataFrame) -> tuple[Data
 
     all_fields = features_names + targets_names + [identifier_name]
     filtered_off_df = filter_fields(filtered_off_df, all_fields)
+    filtered_off_df = filter_feature_name(filtered_off_df)
 
     filtered_off_no_duplicates = delete_duplicates(filtered_off_df, identifier_name)
 

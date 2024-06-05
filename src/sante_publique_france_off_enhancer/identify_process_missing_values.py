@@ -63,36 +63,6 @@ def grade_letter_to_number(letter: str) -> int:
         raise ValueError(f"Unknown grade value: {letter}")
 
 
-def df_calculate_nutriscore(row: pd.Series) -> float | None:
-    if row[['energy_100g', 'saturated-fat_100g', 'sugars_100g',
-            'sodium_100g', 'proteins_100g', 'fiber_100g', 'fruits-vegetables-nuts_100g']].isnull().any():
-        return None
-
-    nutrition_facts = NutritionFacts(
-        row['energy_100g'],
-        row['saturated-fat_100g'],
-        row['sugars_100g'],
-        row['sodium_100g'],
-        row['proteins_100g'],
-        row['fiber_100g'],
-        row['fruits-vegetables-nuts_100g']
-    )
-
-    # Call a method to calculate the nutri-score or similar metric
-    return nutrition_facts.calculate_nutriscore()
-
-
-def fill_missing_nutritional_fact(row: pd.Series) -> pd.Series:
-    nutritional_facts = NutritionFacts.row_to_nutrition_facts(row)
-
-    if pd.isna(row['nutrition-score-fr_100g']) and nutritional_facts.get_nb_attributes_missing() == 0:
-        row['nutrition-score-fr_100g'] = nutritional_facts.calculate_nutriscore()
-    elif nutritional_facts.get_nb_attributes_missing() == 1 and not pd.isna(row['nutrition-score-fr_100g']):
-        nutritional_facts.solve_for_missing_nutrient(row['nutrition-score-fr_100g'])
-
-    return NutritionFacts.nutrition_facts_to_row(nutritional_facts, row)
-
-
 def fill_additives(row: pd.Series) -> pd.Series:
     if row['additives_n'] is None:
         row['additives_n'] = row['median_additives_n']
@@ -166,18 +136,41 @@ def fill_missing_values_with_pnns_groups_2_median(row: pd.Series) -> pd.Series:
     return row
 
 
+def count_null_rows(df):
+    """
+    Counts the number of rows containing null values in a DataFrame.
+
+    Parameters:
+    df (DataFrame): The PySpark DataFrame to be checked for null values.
+
+    Returns:
+    int: The number of rows with at least one null value.
+    """
+    null_condition = None
+    for column in df.columns:
+        if null_condition is None:
+            null_condition = col(column).isNull()
+        else:
+            null_condition = null_condition | col(column).isNull()
+
+    null_count = df.filter(null_condition).count()
+    return null_count
+
+
 if __name__ == '__main__':
     off_df = load_csv()
-    cleaned_data_with_abnormal_values_processed = abnormal_values_processing(off_df).head(100)
+    cleaned_data_with_abnormal_values_processed = abnormal_values_processing(off_df)
 
-    print(f"Before filling missing values, number of nutriscore missing: "
-          f"{cleaned_data_with_abnormal_values_processed['nutrition-score-fr_100g'].isna().sum()}")
+    logger.info(f"Counting null rows before nutrient filtering : "
+                f"{count_null_rows(cleaned_data_with_abnormal_values_processed)}")
 
-    cleaned_data_with_abnormal_values_processed = (
-        cleaned_data_with_abnormal_values_processed.apply(fill_missing_nutritional_fact, axis=1))
+    cleaned_data_filled = NutritionFacts.apply_nutrient_filtering(cleaned_data_with_abnormal_values_processed)
 
-    print(f"After filling missing values, number of nutriscore missing: "
-          f"{cleaned_data_with_abnormal_values_processed['nutrition-score-fr_100g'].isna().sum()}")
+    logger.info(f"Counting null rows after nutrient filtering : {count_null_rows(cleaned_data_filled)}")
+
+    # cleaned_data_filled = set_median_values(cleaned_data_filled)
+
+    logger.info(f"Counting null rows after median values : {count_null_rows(cleaned_data_filled)}")
 
     # cleaned_data_with_abnormal_values_processed = set_median_values(cleaned_data_with_abnormal_values_processed)
     #

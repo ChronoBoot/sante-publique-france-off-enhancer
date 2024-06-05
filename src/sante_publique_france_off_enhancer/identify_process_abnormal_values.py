@@ -18,6 +18,7 @@ from sante_publique_france_off_enhancer.cleaning_filtering_features_products imp
     cleaning_and_filtering_of_features_and_products
 from sante_publique_france_off_enhancer.file_loading import load_csv, save_csv
 from src.sante_publique_france_off_enhancer.classes.bounds import *
+from src.sante_publique_france_off_enhancer.cleaning_filtering_features_products import *
 
 logger = SingletonLogger.get_instance()
 spark = SingletonSparkSession.get_instance()

@@ -72,16 +72,15 @@ def grade_letter_to_number(letter: str) -> int:
         raise ValueError(f"Unknown grade value: {letter}")
 
 
+def fill_additives(row: pd.Series) -> pd.Series:
+    if row['additives_n'] is None:
+        row['additives_n'] = row['median_additives_n']
+    if row['ingredients_from_palm_oil_n'] is None:
+        row['ingredients_from_palm_oil_n'] = row['median_ingredients_from_palm_oil_n']
+    if row['ingredients_that_may_be_from_palm_oil_n'] is None:
+        row['ingredients_that_may_be_from_palm_oil_n'] = row['median_ingredients_that_may_be_from_palm_oil_n']
 
-# def fill_additives(row: pd.Series) -> pd.Series:
-#     if row['additives_n'] is None:
-#         row['additives_n'] = row['median_additives_n']
-#     if row['ingredients_from_palm_oil_n'] is None:
-#         row['ingredients_from_palm_oil_n'] = row['median_ingredients_from_palm_oil_n']
-#     if row['ingredients_that_may_be_from_palm_oil_n'] is None:
-#         row['ingredients_that_may_be_from_palm_oil_n'] = row['median_ingredients_that_may_be_from_palm_oil_n']
-#
-#     return row
+    return row
 
 
 def set_median_values(df: DataFrame) -> DataFrame:
@@ -122,28 +121,49 @@ def get_median_value(df: DataFrame, column_name: str, pnns_group_2: str) -> floa
     return df.loc[df['pnns_groups_2'] == pnns_group_2, column_name].median()
 
 
-# def fill_missing_values_with_pnns_groups_2_median(row: pd.Series) -> pd.Series:
-#     columns = [
-#         'additives_n',
-#         'ingredients_from_palm_oil_n',
-#         'ingredients_that_may_be_from_palm_oil_n',
-#         'energy_100g',
-#         'fat_100g',
-#         'saturated-fat_100g',
-#         'carbohydrates_100g',
-#         'sugars_100g',
-#         'fiber_100g',
-#         'proteins_100g',
-#         'salt_100g',
-#         'sodium_100g',
-#         'fruits-vegetables-nuts_100g'
-#     ]
-#
-#     for column in columns:
-#         if row[column] is None:
-#             row[column] = row[f"median_{column}"]
-#
-#     return row
+def fill_missing_values_with_pnns_groups_2_median(row: pd.Series) -> pd.Series:
+    columns = [
+        'additives_n',
+        'ingredients_from_palm_oil_n',
+        'ingredients_that_may_be_from_palm_oil_n',
+        'energy_100g',
+        'fat_100g',
+        'saturated-fat_100g',
+        'carbohydrates_100g',
+        'sugars_100g',
+        'fiber_100g',
+        'proteins_100g',
+        'salt_100g',
+        'sodium_100g',
+        'fruits-vegetables-nuts_100g'
+    ]
+
+    for column in columns:
+        if row[column] is None:
+            row[column] = row[f"median_{column}"]
+
+    return row
+
+
+def count_null_rows(df):
+    """
+    Counts the number of rows containing null values in a DataFrame.
+
+    Parameters:
+    df (DataFrame): The PySpark DataFrame to be checked for null values.
+
+    Returns:
+    int: The number of rows with at least one null value.
+    """
+    null_condition = None
+    for column in df.columns:
+        if null_condition is None:
+            null_condition = col(column).isNull()
+        else:
+            null_condition = null_condition | col(column).isNull()
+
+    null_count = df.filter(null_condition).count()
+    return null_count
 
 
 if __name__ == '__main__':

@@ -7,6 +7,7 @@ from sante_publique_france_off_enhancer.classes.singleton_logger import Singleto
 
 logger = SingletonLogger.get_instance()
 
+
 @dataclasses.dataclass
 class DataFrameField:
     name: str
@@ -17,7 +18,6 @@ class DataFrameField:
 
     def __post_init__(self):
         self.fill_percent = 100 - self.na_percent if self.na_percent is not None else None
-
 
     @staticmethod
     def process_and_set_na_percent(dataframe_fields: 'list[DataFrameField]', df: DataFrame):

@@ -1,16 +1,30 @@
 """## Step 2 : Identify and process abnormal values"""
+import os
+from functools import cache
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.express as px
 import seaborn as sns
-from pyspark.sql.functions import desc
-from pyspark.sql.types import StructType, StructField, IntegerType, DoubleType
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import desc, when, col
+from pyspark.sql.types import Row
 
+from sante_publique_france_off_enhancer.classes.singleton_logger import SingletonLogger
+from sante_publique_france_off_enhancer.classes.singleton_spark_session import SingletonSparkSession
+from sante_publique_france_off_enhancer.cleaning_filtering_features_products import \
+    CSV_FILE_PATH as CLEANED_CSV_FILE_PATH
+from sante_publique_france_off_enhancer.cleaning_filtering_features_products import \
+    cleaning_and_filtering_of_features_and_products
+from sante_publique_france_off_enhancer.file_loading import load_csv, save_csv
 from src.sante_publique_france_off_enhancer.classes.bounds import *
-from src.sante_publique_france_off_enhancer.cleaning_filtering_features_products import *
 
 logger = SingletonLogger.get_instance()
 spark = SingletonSparkSession.get_instance()
+
+CSV_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data')
+CSV_FILE_NAME = "off_cleaned_and_filtered_abnormal_values_processed.csv"
+CSV_FILE_PATH = os.path.join(CSV_DIR, CSV_FILE_NAME)
 
 
 def boxplot_features_pyplot(df: pd.DataFrame, features_names: list[str], title: str):
@@ -214,22 +228,20 @@ def find_higher_bound(df: DataFrame, column: str, frequency_threshold: float) ->
 
 @cache
 def abnormal_values_processing(df: DataFrame) -> DataFrame:
-    cleaned_df, features = cleaning_and_filtering_of_features_and_products(df)
-
-    logger.info(f"Before processing abnormal values: {cleaned_df.count()}")
+    logger.info(f"Before processing abnormal values: {df.count()}")
 
     frequency_threshold = 0.01
 
-    additives_n_higher_bound = find_higher_bound(cleaned_df, "additives_n", frequency_threshold)
-    ingredients_from_palm_oil_n_higher_bound = find_higher_bound(cleaned_df, "ingredients_from_palm_oil_n",
+    additives_n_higher_bound = find_higher_bound(df, "additives_n", frequency_threshold)
+    ingredients_from_palm_oil_n_higher_bound = find_higher_bound(df, "ingredients_from_palm_oil_n",
                                                                  frequency_threshold)
-    ingredients_that_may_be_from_palm_oil_n_higher_bound = find_higher_bound(cleaned_df,
+    ingredients_that_may_be_from_palm_oil_n_higher_bound = find_higher_bound(df,
                                                                              "ingredients_that_may_be_from_palm_oil_n",
                                                                              frequency_threshold)
 
     nutrition_score_lower_bound, nutrition_score_higher_bound = outlier_thresholds(
-        cleaned_df,
-        "nutrition-score-fr_100g",
+        df,
+        "nutrition_score_fr_100g",
         -20
     )
 
@@ -238,7 +250,7 @@ def abnormal_values_processing(df: DataFrame) -> DataFrame:
         Bounds("ingredients_from_palm_oil_n", 0, ingredients_from_palm_oil_n_higher_bound),
         Bounds("ingredients_that_may_be_from_palm_oil_n", 0, ingredients_that_may_be_from_palm_oil_n_higher_bound),
         Bounds("fat_100g", 0, 100),
-        Bounds("saturated-fat_100g", 0, 100),
+        Bounds("saturated_fat_100g", 0, 100),
         Bounds("sugars_100g", 0, 100),
         Bounds("salt_100g", 0, 100),
         Bounds("energy_100g", 0, 3700),
@@ -246,13 +258,13 @@ def abnormal_values_processing(df: DataFrame) -> DataFrame:
         Bounds("fiber_100g", 0, 11),
         Bounds("proteins_100g", 0, 33),
         Bounds("sodium_100g", 0, 40),
-        Bounds("nutrition-score-fr_100g", nutrition_score_lower_bound, nutrition_score_higher_bound),
-        Bounds("fruits-vegetables-nuts_100g", 0, 100)
+        Bounds("nutrition_score_fr_100g", nutrition_score_lower_bound, nutrition_score_higher_bound),
+        Bounds("fruits_vegetables_nuts_100g", 0, 100)
     ]
 
     allowed_values_nutritional_grade = ['a', 'b', 'c', 'd', 'e']
 
-    filter_df = filter_abnormal_values(bounds_list, cleaned_df)
+    filter_df = filter_abnormal_values(bounds_list, df)
     filter_df = filter_allowed_values(allowed_values_nutritional_grade, filter_df, "nutrition_grade_fr")
 
     logger.info(f"After processing abnormal values: {filter_df.count()}")
@@ -261,7 +273,12 @@ def abnormal_values_processing(df: DataFrame) -> DataFrame:
 
 
 if __name__ == "__main__":
-    off_df = load_csv()
+    if os.path.exists(CLEANED_CSV_FILE_PATH):
+        cleaned_and_filtered_df = load_csv(CLEANED_CSV_FILE_PATH)
+    else:
+        off_df = load_csv()
+        cleaned_and_filtered_df = cleaning_and_filtering_of_features_and_products(off_df)
 
-    cleaned_data_with_abnormal_values_processed = abnormal_values_processing(
-        off_df)
+    cleaned_data_with_abnormal_values_processed = abnormal_values_processing(cleaned_and_filtered_df)
+
+    save_csv(cleaned_data_with_abnormal_values_processed, CSV_FILE_PATH)

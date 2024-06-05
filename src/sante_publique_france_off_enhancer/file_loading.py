@@ -9,22 +9,40 @@ from sante_publique_france_off_enhancer.classes.singleton_spark_session import S
 logger = SingletonLogger.get_instance()
 spark = SingletonSparkSession.get_instance()
 
+#TODO Look at how cache works => only in one session
+
 
 @cache
-def load_csv():
+def load_csv(file_path: str = None) -> DataFrame:
     """Load the CSV file."""
-    logger.info("Loading the CSV file")
+    if file_path is None:
+        file_path = 'fr.openfoodfacts.org.products.csv'
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        off_path = os.path.join(base_dir, '..', '..', 'csv', file_path)
+    else:
+        off_path = file_path
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    off_path = os.path.join(base_dir, '..', '..', 'csv', 'fr.openfoodfacts.org.products.csv')
-    logger.debug(f"CSV file path: {off_path}")
+    logger.info(f"Loading the CSV file {file_path}")
 
     df = spark.read.csv(off_path, sep='\t', header=True, inferSchema=True)
 
-    logger.info("CSV file loaded")
+    logger.info(f"CSV file loaded {file_path}")
     logger.info(f"Number of products: {df.count()}")
 
     return df
+
+
+def save_csv(df: DataFrame, path: str):
+    """Save the DataFrame to a CSV file."""
+    logger.info(f"Saving the DataFrame to a CSV file: {path}")
+
+    pandas_df = df.toPandas()
+
+    pandas_df.to_csv(path, sep='\t', header=True, index=False)
+
+    logger.info("DataFrame saved to a CSV file")
+
+    return path
 
 
 def print_info(df: DataFrame):

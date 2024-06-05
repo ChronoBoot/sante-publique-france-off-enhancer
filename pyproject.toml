@@ -24,3 +24,8 @@ missingno = "^0.5.2"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+package=[{include="sante_publique_france_off_enhancer", from="src"}]
+
+[tool.poetry.scripts]
+sante-publique-france-off-enhancer = "sante_publique_france_off_enhancer.main:main"

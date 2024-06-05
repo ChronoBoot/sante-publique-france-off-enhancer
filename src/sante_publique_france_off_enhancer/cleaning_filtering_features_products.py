@@ -8,6 +8,10 @@ from src.sante_publique_france_off_enhancer.classes.singleton_logger import Sing
 logger = SingletonLogger.get_instance()
 spark = SingletonSparkSession.get_instance()
 
+CSV_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data')
+CSV_FILE_NAME = "off_cleaned_and_filtered.csv"
+CSV_FILE_PATH = os.path.join(CSV_DIR, CSV_FILE_NAME)
+
 
 def feature_listing(df: DataFrame) -> tuple[list[DataFrameField], list[DataFrameField], list[DataFrameField]]:
     logger.debug("Listing features")
@@ -138,6 +142,17 @@ def filtered_row(df: DataFrame, targets_names: list[str], incorrect_value=None):
     return filtered_off_df
 
 
+# Pyspark doesn't handle well column names with spaces or dashes
+def format_column_name(df: DataFrame) -> DataFrame:
+    logger.debug("Formatting column names")
+
+    for column in df.columns:
+        df = df.withColumnRenamed(column, column.replace(" ", "_").replace("-", "_"))
+    logger.debug("Column names formatted")
+
+    return df
+
+
 @cache
 def cleaning_and_filtering_of_features_and_products(df: DataFrame) -> tuple[DataFrame, list[DataFrameField]]:
     logger.info(f"Before cleaning and filtering: {df.count()} products.")
@@ -165,6 +180,7 @@ def cleaning_and_filtering_of_features_and_products(df: DataFrame) -> tuple[Data
     filtered_off_df = filter_fields(filtered_off_df, all_fields)
 
     filtered_off_no_duplicates = delete_duplicates(filtered_off_df, identifier_name)
+    filtered_off_no_duplicates = format_column_name(filtered_off_no_duplicates)
 
     logger.info(f"After cleaning and filtering: {filtered_off_no_duplicates.count()} products.")
 
@@ -175,3 +191,5 @@ if __name__ == "__main__":
     # Example usage
     off_df = load_csv()
     cleaned_data, cleaned_fields = cleaning_and_filtering_of_features_and_products(off_df)
+
+    save_csv(cleaned_data, CSV_FILE_PATH)
